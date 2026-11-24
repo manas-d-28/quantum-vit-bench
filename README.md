@@ -34,7 +34,35 @@ Classical "mimics" of each scoring trick are included, so we can tell whether a 
   | Hybrid (quantum Q/K/V) | 3,114 | 18.9 | 81.4% |
 
   See [`phase1/`](phase1/) for the scripts and the fixes needed on current Kaggle images.
-- **Phase 2 (next): shared backbone + classical baseline**, then the quantum modules one at a time.
+- **Phase 2 (in progress): shared backbone** in [`qvb/`](qvb/). The first three attention modules:
+  - `classic`: standard dot-product attention
+  - `gaussian`: classical mimic of the QSANN/Unlu scoring rule
+  - `unlu`: Unlu et al.'s quantum Q/K/V circuits, checked gate by gate against the official repo with [`tools/check_unlu_circuits.py`](tools/check_unlu_circuits.py)
+
+## The shared backbone (`qvb/`)
+- `data.py`: MNIST resized to 14×14 and cut into 7 row-patches (7 tokens × 28 features). Split 4000/1000/1000 with a fixed seed, so every model sees the same images.
+- `backbone.py`: tiny pre-norm ViT, identical for every model:
+  - token embedding + learned positional embedding
+  - 2 blocks of `x + W_O·Attn(LN x)` and `x + FFN(LN x)`
+  - mean pooling, then a linear classifier
+- `attention.py`: the swappable attention modules. Every module splits the 16-dim embedding into 4 heads of 4 features, so each quantum circuit uses 4 qubits.
+- `quantum.py`: circuits (TensorCircuit-NG on JAX) wrapped as PyTorch layers. Each circuit type compiles once and is shared by every layer.
+- `train.py`: trains one model and appends a row to `results/results.csv`. The row records params, qubits per circuit, circuits per image, best val, test acc (best-val checkpoint) and time per epoch.
+
+```
+python -m qvb.train --model unlu --seed 0 --epochs 60
+python -m qvb.train --model classic --quick        # 2-epoch smoke test on 640 images
+```
+
+**Differences from Unlu et al.'s own code.** These are deliberate, so that only the attention differs between models:
+1. Their classical and hybrid blocks are wired differently. The hybrid has no separate attention residual or second LayerNorm. Here both use the same block.
+2. Their positional embedding adds the same vector to every token. Here it's learned per token.
+3. Their `head_dimension=8` with Embed 16 means 8 heads of 2 features (2-qubit circuits). Here it's 4 heads × 4 qubits, the setting of their paper's main result.
 
 ## Running on Kaggle
-Notebooks clone this repo and run a script. Quantum circuits are simulated with TensorCircuit-NG on JAX. These run on CPU, so **CPU sessions are recommended**: no GPU queue, and no GPU quota used.
+Notebooks clone this repo and run a script. Quantum circuits are simulated with TensorCircuit-NG on JAX. These run on CPU, so **CPU sessions are recommended**: no GPU queue, and no GPU quota used. Use a session with internet on:
+```
+!pip install -q tensorcircuit-ng jax
+!git clone -q https://github.com/manas-d-28/quantum-vit-bench.git /kaggle/working/bench
+!cd /kaggle/working/bench && python -m qvb.train --model classic --seed 0 --out /kaggle/working/results
+```
