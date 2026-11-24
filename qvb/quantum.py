@@ -60,7 +60,57 @@ def unlu_value(x, w, n):
     return K.stack([K.real(c.expectation_ps(z=[i])) for i in range(n)])
 
 
-N_PARAMS = {unlu_query_key: lambda n: 3 * n + 1, unlu_value: lambda n: 3 * n}
+# ----------------------------------------------------------------------------
+# QSANN: Li, Zhao & Wang (2022), arXiv:2205.05625. No official code; built from
+# the paper (Eqs. 3-4, Fig. 2, Table I).
+#   * The encoder takes d = n(D_enc + 2) features on n qubits: Hadamards, then the
+#     features are the angles of an Rx layer and an Ry layer, followed by D_enc
+#     blocks of (CNOT ring, Ry layer). For our 4-feature heads: n = 2, D_enc = 0.
+#   * U_q, U_k, U_v use the same ansatz with trainable angles and depth D = 1
+#     (Table I uses D = 1 for most datasets): n(D + 2) = 3n parameters each.
+#   * Query and key measure <Z_1>. The value measures d Pauli observables taken
+#     in the paper's order Z_1..Z_n, X_1..X_n, Y_1..Y_n (first d of them).
+# ----------------------------------------------------------------------------
+QSANN_DEPTH = 1
+
+
+def _qsann_ansatz(c, angles, n, depth):
+    """Rx layer, Ry layer, then `depth` blocks of (CNOT ring, Ry layer)."""
+    for i in range(n):
+        c.rx(i, theta=angles[i])
+    for i in range(n):
+        c.ry(i, theta=angles[n + i])
+    for b in range(depth):
+        if n > 1:
+            _cnot_ring(c, n)
+        for i in range(n):
+            c.ry(i, theta=angles[(b + 2) * n + i])
+
+
+def _qsann_state(x, w, n):
+    c = tc.Circuit(n)
+    for i in range(n):
+        c.H(i)
+    _qsann_ansatz(c, x, n, depth=x.shape[0] // n - 2)      # encoder, D_enc from d = n(D_enc+2)
+    _qsann_ansatz(c, w, n, depth=QSANN_DEPTH)              # trainable U_q / U_k / U_v
+    return c
+
+
+def qsann_query_key(x, w, n):
+    return K.real(_qsann_state(x, w, n).expectation_ps(z=[0]))
+
+
+def qsann_value(x, w, n):
+    c = _qsann_state(x, w, n)
+    obs = ([{"z": [i]} for i in range(n)] + [{"x": [i]} for i in range(n)]
+           + [{"y": [i]} for i in range(n)])[: x.shape[0]]
+    return K.stack([K.real(c.expectation_ps(**o)) for o in obs])
+
+
+N_PARAMS = {unlu_query_key: lambda n: 3 * n + 1, unlu_value: lambda n: 3 * n,
+            qsann_query_key: lambda n: n * (QSANN_DEPTH + 2),
+            qsann_value: lambda n: n * (QSANN_DEPTH + 2)}
+INIT_STD = {qsann_query_key: 0.1, qsann_value: 0.1}   # paper: N(0, 0.01) i.e. std 0.1
 
 
 _COMPILED = {}
@@ -85,7 +135,8 @@ class QLayer(nn.Module):
     def __init__(self, circuit, n_qubits):
         super().__init__()
         n_params = N_PARAMS[circuit](n_qubits)
-        self.w = nn.Parameter(torch.randn(n_params) / n_params ** 0.5)   # Unlu's init
+        std = INIT_STD.get(circuit, 1 / n_params ** 0.5)               # default: Unlu's init
+        self.w = nn.Parameter(torch.randn(n_params) * std)
         self.f = _batched(circuit, n_qubits)
 
     def forward(self, x):

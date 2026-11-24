@@ -38,6 +38,8 @@ Classical "mimics" of each scoring trick are included, so we can tell whether a 
   - `classic`: standard dot-product attention
   - `gaussian`: classical mimic of the QSANN/Unlu scoring rule
   - `unlu`: Unlu et al.'s quantum Q/K/V circuits, checked gate by gate against the official repo with [`tools/check_unlu_circuits.py`](tools/check_unlu_circuits.py)
+  - `qsann`: QSANN (Li et al. 2022), built from the paper (no official code). A 4-feature head is encoded on 2 qubits (d = n(D_enc+2) with D_enc = 0). U_q/U_k/U_v have depth 1. Q and K read ⟨Z₁⟩; V reads Z₁, Z₂, X₁, X₂. The Gaussian score is unscaled.
+- Every circuit is checked against an independent NumPy statevector simulation: `python -m tools.test_circuits`
 
 ## Phase 2 results (shared backbone, MNIST, 60 epochs, seeds 0/1/2, Kaggle CPU)
 | Attention | Params | Qubits / circuit | Circuits / image | s/epoch | Val acc | **Test acc** |

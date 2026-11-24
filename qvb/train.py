@@ -32,7 +32,7 @@ def evaluate(model, loader, device):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--model", required=True, choices=["classic", "gaussian", "unlu"])
+    p.add_argument("--model", required=True, choices=["classic", "gaussian", "unlu", "qsann"])
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--epochs", type=int, default=60)
     p.add_argument("--embed", type=int, default=16)
@@ -60,7 +60,7 @@ def main():
 
     d = a.embed // a.heads
     q = QUANTUM.get(a.model)
-    meta = {"qubits_per_circuit": d if q else 0,
+    meta = {"qubits_per_circuit": q["qubits"](d) if q else 0,
             "circuits_per_image": q["circuits_per_token_per_head"] * n_tokens * a.heads * a.layers if q else 0}
     print(f"model={a.model} seed={a.seed} params={n_params} {meta}", flush=True)
 
