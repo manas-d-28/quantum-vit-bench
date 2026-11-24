@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+data/
+best_state_on_training*
+temp_history
+*.ipynb_checkpoints
