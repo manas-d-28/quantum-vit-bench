@@ -4,4 +4,5 @@ data/
 best_state_on_training*
 temp_history
 *.ipynb_checkpoints
-results/
+results/*
+!results/phase2/
