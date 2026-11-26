@@ -51,12 +51,14 @@ Classical "mimics" of each scoring trick are included, so we can tell whether a 
 | `gaussian` (classical mimic) | 3,786 | — | — | 1.5 | 94.2 ± 0.8 | **93.3 ± 1.2** |
 | `unlu` (quantum Q/K/V) | 3,898 | 4 | 168 | 15.4 | 95.9 ± 0.6 | **93.9 ± 0.2** |
 | `qsann` (quantum, QSANN) | 3,738 | 2 | 168 | 11.9 | 93.9 ± 0.3 | **92.6 ± 1.0** |
+| `comajoan` (quantum Q/K/V/O + FFN) | 3,242 | 16 / 32 | 70 | 2.2* | 92.5 ± 0.7 | **91.5 ± 0.7** |
 
 Mean ± sample std over 3 seeds. Test accuracy is taken at the best-validation epoch, on 1000 test images, so one image is 0.1 points.
 - **In the same backbone, the quantum model is no longer behind.** It scored about 1.6 points above dot-product attention, and every quantum seed beat every classic seed. In Phase 1 it was 7 points behind, but there the two models were also wired differently.
 - **The classical mimic gets most of the gain.** It uses the same Gaussian scoring rule with ordinary weights, and it lands within ~0.6 points of the quantum model, which is inside the seed spread. So far, the scoring rule explains the improvement better than the qubits do.
 - **The quantum model costs ~10× more training time** in simulation.
-- **QSANN (2-qubit circuits) lands at 92.6 ± 1.0,** between classic and the mimic, and within the seed spread of both. Its seeds overlap with every other model's, so it shows no measurable gain from its qubits. Per-seed numbers: `results/phase2/`, `results/phase3/`.
+- **QSANN (2-qubit circuits) lands at 92.6 ± 1.0,** between classic and the mimic, and within the seed spread of both. Its seeds overlap with every other model's, so it shows no measurable gain from its qubits. Per-seed numbers: `results/phase2/`, `results/phase3/`, `results/phase4/`.
+- **Comajoan Cara (91.5 ± 0.7) is the lowest of the five, about 0.8 below dot-product attention, and its seeds overlap classic's.** It also has ~18% fewer parameters (3,242), because each quantum layer has one angle per qubit instead of a weight matrix. *Its 2.2 s/epoch uses the exact cosine-product formula, not circuit simulation. Its "quantum" layers are classically computable, so this model shows no quantum advantage by construction.
 
 ## The shared backbone (`qvb/`)
 - `data.py`: MNIST resized to 14×14 and cut into 7 row-patches (7 tokens × 28 features). Split 4000/1000/1000 with a fixed seed, so every model sees the same images.

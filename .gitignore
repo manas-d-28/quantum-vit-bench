@@ -7,3 +7,4 @@ temp_history
 results/*
 !results/phase2/
 !results/phase3/
+!results/phase4/

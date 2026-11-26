@@ -1,0 +1,4 @@
+model,seed,epochs,params,embed,heads,layers,qubits_per_circuit,circuits_per_image,best_val,best_epoch,test_acc,sec_per_epoch,wall_min
+comajoan,0,60,3242,16,4,2,16/32,70,0.919,49,0.923,2.2,2.2
+comajoan,1,60,3242,16,4,2,16/32,70,0.932,46,0.91,2.2,2.2
+comajoan,2,60,3242,16,4,2,16/32,70,0.924,32,0.913,2.2,2.2
