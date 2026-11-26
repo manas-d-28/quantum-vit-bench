@@ -1,0 +1,4 @@
+model,seed,epochs,params,embed,heads,layers,qubits_per_circuit,circuits_per_image,best_val,best_epoch,test_acc,sec_per_epoch,wall_min
+uniform,0,60,3722,16,4,2,0,0,0.946,47,0.945,0.9,0.9
+uniform,1,60,3722,16,4,2,0,0,0.951,41,0.936,0.9,0.9
+uniform,2,60,3722,16,4,2,0,0,0.949,59,0.927,0.9,0.9
