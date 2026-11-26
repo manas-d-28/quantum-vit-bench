@@ -97,6 +97,28 @@ def main():
         err = max(np.max(np.abs(formula - got)), np.max(np.abs(formula - ref)))
         ok &= err < 1e-4
         print(f"comajoan_layer   n={n}: max |formula - tc/numpy| = {err:.2e}")
+    # HQViT: the PyTorch-built 16x16 PQC unitary vs TensorCircuit applying the same gates
+    from qvb import hqvit as HQ
+    for n in [2, 3, 4]:
+        w = torch.tensor(rng.uniform(-np.pi, np.pi, HQ.n_params(n)), dtype=torch.float32)
+        u = HQ.pqc_unitary(w, n).numpy()
+        cols = []
+        for b in range(2 ** n):
+            e = np.zeros(2 ** n, np.complex64); e[b] = 1
+            c = Q.tc.Circuit(n, inputs=e)
+            k = 0
+            for _ in range(HQ.HQVIT_DEPTH):
+                for i in range(n): c.ry(i, theta=float(w[k + i]))
+                k += n
+                for i in range(n): c.rz(i, theta=float(w[k + i]))
+                k += n
+                for a, t in HQ.ring_cnots(n): c.cnot(a, t)
+            for i in range(n): c.ry(i, theta=float(w[k + i]))
+            cols.append(np.asarray(c.state()))
+        err = np.max(np.abs(u - np.stack(cols, axis=1)))
+        unit = np.max(np.abs(u.conj().T @ u - np.eye(2 ** n)))
+        ok &= err < 1e-4 and unit < 1e-4
+        print(f"hqvit_unitary    n={n}: max |torch - tc| = {err:.2e}, max |U^dag U - I| = {unit:.2e}")
     # analytic check: QSANN with all-zero inputs and weights gives |++>, so <Z>=0 and <X>=1
     v = np.asarray(Q.qsann_value(np.zeros(4, np.float32), np.zeros(6, np.float32), 2))
     print("qsann_value(0, 0) =", np.round(v, 4), "(expected [0, 0, 1, 1])")

@@ -32,7 +32,7 @@ def evaluate(model, loader, device):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--model", required=True, choices=["classic", "gaussian", "unlu", "qsann", "comajoan"])
+    p.add_argument("--model", required=True, choices=["classic", "gaussian", "unlu", "qsann", "comajoan", "hqvit", "overlap"])
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--epochs", type=int, default=60)
     p.add_argument("--embed", type=int, default=16)
@@ -57,6 +57,10 @@ def main():
         parts = dict(make_attention=lambda: ComajoanAttention(a.embed, a.heads),
                      make_proj=lambda: CosineProductLayer(a.embed),
                      make_ffn=lambda: ComajoanFFN(a.embed, a.ff))
+    elif a.model in ("hqvit", "overlap"):   # single full-width head, as in HQViT
+        from .hqvit import HQViTAttention, OverlapMimic
+        cls = HQViTAttention if a.model == "hqvit" else OverlapMimic
+        parts = dict(make_attention=lambda: cls(a.embed))
     else:
         parts = dict(make_attention=make_attention(a.model, a.embed, a.heads))
     model = TinyViT(n_tokens, token_dim, embed_dim=a.embed, n_layers=a.layers, ff_dim=a.ff,
@@ -67,7 +71,11 @@ def main():
 
     d = a.embed // a.heads
     q = QUANTUM.get(a.model)
-    if a.model == "comajoan":     # per layer and token: Q, K, V, W_O (embed qubits) + FFN (ff qubits)
+    if a.model == "hqvit":        # 2 registers of ceil(log2(T*E)) qubits + 1 swap-test ancilla;
+        import math               # per layer: one swap-test circuit (Q,K) and one V circuit
+        nq = math.ceil(math.log2(n_tokens * a.embed))
+        meta = {"qubits_per_circuit": f"{2 * nq + 1}", "circuits_per_image": 2 * a.layers}
+    elif a.model == "comajoan":     # per layer and token: Q, K, V, W_O (embed qubits) + FFN (ff qubits)
         meta = {"qubits_per_circuit": f"{a.embed}/{a.ff}", "circuits_per_image": 5 * n_tokens * a.layers}
     else:
         meta = {"qubits_per_circuit": q["qubits"](d) if q else 0,
