@@ -1,0 +1,7 @@
+model,seed,epochs,params,embed,heads,layers,qubits_per_circuit,circuits_per_image,best_val,best_epoch,test_acc,sec_per_epoch,wall_min
+hqvit,0,60,3714,16,4,2,15,4,0.954,43,0.932,5.5,5.5
+overlap,0,60,5130,16,4,2,0,0,0.947,48,0.938,0.8,0.8
+hqvit,1,60,3714,16,4,2,15,4,0.95,59,0.937,5.5,5.5
+overlap,1,60,5130,16,4,2,0,0,0.954,53,0.921,0.8,0.8
+hqvit,2,60,3714,16,4,2,15,4,0.954,59,0.945,5.6,5.6
+overlap,2,60,5130,16,4,2,0,0,0.962,60,0.945,0.8,0.8
