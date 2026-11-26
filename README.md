@@ -41,17 +41,19 @@ Classical "mimics" of each scoring trick are included, so we can tell whether a 
   - `qsann`: QSANN (Li et al. 2022), built from the paper (no official code). A 4-feature head is encoded on 2 qubits (d = n(D_enc+2) with D_enc = 0). U_q/U_k/U_v have depth 1. Q and K read ⟨Z₁⟩; V reads Z₁, Z₂, X₁, X₂. The Gaussian score is unscaled.
 - Every circuit is checked against an independent NumPy statevector simulation: `python -m tools.test_circuits`
 
-## Phase 2 results (shared backbone, MNIST, 60 epochs, seeds 0/1/2, Kaggle CPU)
+## Results (shared backbone, MNIST, 60 epochs, seeds 0/1/2, Kaggle CPU)
 | Attention | Params | Qubits / circuit | Circuits / image | s/epoch | Val acc | **Test acc** |
 |---|---|---|---|---|---|---|
 | `classic` (dot product) | 3,978 | — | — | 1.5 | 94.3 ± 0.3 | **92.3 ± 0.5** |
 | `gaussian` (classical mimic) | 3,786 | — | — | 1.5 | 94.2 ± 0.8 | **93.3 ± 1.2** |
 | `unlu` (quantum Q/K/V) | 3,898 | 4 | 168 | 15.4 | 95.9 ± 0.6 | **93.9 ± 0.2** |
+| `qsann` (quantum, QSANN) | 3,738 | 2 | 168 | 11.9 | 93.9 ± 0.3 | **92.6 ± 1.0** |
 
 Mean ± sample std over 3 seeds. Test accuracy is taken at the best-validation epoch, on 1000 test images, so one image is 0.1 points.
 - **In the same backbone, the quantum model is no longer behind.** It scored about 1.6 points above dot-product attention, and every quantum seed beat every classic seed. In Phase 1 it was 7 points behind, but there the two models were also wired differently.
 - **The classical mimic gets most of the gain.** It uses the same Gaussian scoring rule with ordinary weights, and it lands within ~0.6 points of the quantum model, which is inside the seed spread. So far, the scoring rule explains the improvement better than the qubits do.
 - **The quantum model costs ~10× more training time** in simulation.
+- **QSANN (2-qubit circuits) lands at 92.6 ± 1.0,** between classic and the mimic, and within the seed spread of both. Its seeds overlap with every other model's, so it shows no measurable gain from its qubits. Per-seed numbers: `results/phase2/`, `results/phase3/`.
 
 ## The shared backbone (`qvb/`)
 - `data.py`: MNIST resized to 14×14 and cut into 7 row-patches (7 tokens × 28 features). Split 4000/1000/1000 with a fixed seed, so every model sees the same images.

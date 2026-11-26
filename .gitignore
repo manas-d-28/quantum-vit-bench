@@ -6,3 +6,4 @@ temp_history
 *.ipynb_checkpoints
 results/*
 !results/phase2/
+!results/phase3/
