@@ -107,7 +107,27 @@ def qsann_value(x, w, n):
     return K.stack([K.real(c.expectation_ps(**o)) for o in obs])
 
 
-N_PARAMS = {unlu_query_key: lambda n: 3 * n + 1, unlu_value: lambda n: 3 * n,
+# ----------------------------------------------------------------------------
+# Comajoan Cara et al. (2024): reference simulation of their quantum layer, copied
+# from their quantum_layer.py (angle_embedding + one basic_vqc layer, <Z_i> on all
+# qubits). Training uses the exact cosine-product formula in qvb/comajoan.py; this
+# version only exists so tools/test_circuits.py can check that formula.
+# ----------------------------------------------------------------------------
+def comajoan_layer(x, w, n):
+    c = tc.Circuit(n)
+    for j in range(n):
+        c.rx(j, theta=x[j])
+    for j in range(n):
+        c.rx(j, theta=w[j])
+    if n == 2:
+        c.cnot(0, 1)
+    elif n > 2:
+        for j in range(n):
+            c.cnot(j, (j + 1) % n)
+    return K.stack([K.real(c.expectation_ps(z=[i])) for i in range(n)])
+
+
+N_PARAMS = {comajoan_layer: lambda n: n, unlu_query_key: lambda n: 3 * n + 1, unlu_value: lambda n: 3 * n,
             qsann_query_key: lambda n: n * (QSANN_DEPTH + 2),
             qsann_value: lambda n: n * (QSANN_DEPTH + 2)}
 INIT_STD = {qsann_query_key: 0.1, qsann_value: 0.1}   # paper: N(0, 0.01) i.e. std 0.1

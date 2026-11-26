@@ -84,6 +84,19 @@ def main():
             err = np.max(np.abs(ref - got))
             ok &= err < 1e-4
         print(f"{fn.__name__:16s} n={n} d={d}: max |tc - numpy| = {err:.2e}")
+    # Comajoan Cara: exact cosine-product formula vs TensorCircuit vs NumPy
+    import torch
+    from qvb.comajoan import CosineProductLayer
+    for n in [2, 3, 4, 6, 8]:
+        x = rng.uniform(-np.pi, np.pi, n).astype(np.float32)
+        layer = CosineProductLayer(n)
+        w = layer.w.detach().numpy()
+        formula = layer(torch.tensor(x)).detach().numpy()
+        got = np.asarray(Q.comajoan_layer(x, w, n))
+        ref = numpy_run(Q.comajoan_layer, x, w, n)
+        err = max(np.max(np.abs(formula - got)), np.max(np.abs(formula - ref)))
+        ok &= err < 1e-4
+        print(f"comajoan_layer   n={n}: max |formula - tc/numpy| = {err:.2e}")
     # analytic check: QSANN with all-zero inputs and weights gives |++>, so <Z>=0 and <X>=1
     v = np.asarray(Q.qsann_value(np.zeros(4, np.float32), np.zeros(6, np.float32), 2))
     print("qsann_value(0, 0) =", np.round(v, 4), "(expected [0, 0, 1, 1])")

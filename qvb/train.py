@@ -32,7 +32,7 @@ def evaluate(model, loader, device):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--model", required=True, choices=["classic", "gaussian", "unlu", "qsann"])
+    p.add_argument("--model", required=True, choices=["classic", "gaussian", "unlu", "qsann", "comajoan"])
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--epochs", type=int, default=60)
     p.add_argument("--embed", type=int, default=16)
@@ -52,16 +52,26 @@ def main():
     tr, va, te, n_tokens, token_dim = (load_mnist(n_images=sum(split), split=split)
                                        if a.quick else load_mnist())
 
-    model = TinyViT(n_tokens, token_dim, make_attention(a.model, a.embed, a.heads),
-                    embed_dim=a.embed, n_layers=a.layers, ff_dim=a.ff).to(a.device)
+    if a.model == "comajoan":     # quantum Q/K/V, quantum W_O and a quantum layer in the FFN
+        from .comajoan import ComajoanAttention, ComajoanFFN, CosineProductLayer
+        parts = dict(make_attention=lambda: ComajoanAttention(a.embed, a.heads),
+                     make_proj=lambda: CosineProductLayer(a.embed),
+                     make_ffn=lambda: ComajoanFFN(a.embed, a.ff))
+    else:
+        parts = dict(make_attention=make_attention(a.model, a.embed, a.heads))
+    model = TinyViT(n_tokens, token_dim, embed_dim=a.embed, n_layers=a.layers, ff_dim=a.ff,
+                    **parts).to(a.device)
     n_params = sum(p.numel() for p in model.parameters())
     opt = torch.optim.Adam(model.parameters(), lr=a.lr)
     loss_fn = nn.CrossEntropyLoss()
 
     d = a.embed // a.heads
     q = QUANTUM.get(a.model)
-    meta = {"qubits_per_circuit": q["qubits"](d) if q else 0,
-            "circuits_per_image": q["circuits_per_token_per_head"] * n_tokens * a.heads * a.layers if q else 0}
+    if a.model == "comajoan":     # per layer and token: Q, K, V, W_O (embed qubits) + FFN (ff qubits)
+        meta = {"qubits_per_circuit": f"{a.embed}/{a.ff}", "circuits_per_image": 5 * n_tokens * a.layers}
+    else:
+        meta = {"qubits_per_circuit": q["qubits"](d) if q else 0,
+                "circuits_per_image": q["circuits_per_token_per_head"] * n_tokens * a.heads * a.layers if q else 0}
     print(f"model={a.model} seed={a.seed} params={n_params} {meta}", flush=True)
 
     best_val, best_epoch, best_state, curve = -1.0, -1, None, []

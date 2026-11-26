@@ -39,7 +39,10 @@ Classical "mimics" of each scoring trick are included, so we can tell whether a 
   - `gaussian`: classical mimic of the QSANN/Unlu scoring rule
   - `unlu`: Unlu et al.'s quantum Q/K/V circuits, checked gate by gate against the official repo with [`tools/check_unlu_circuits.py`](tools/check_unlu_circuits.py)
   - `qsann`: QSANN (Li et al. 2022), built from the paper (no official code). A 4-feature head is encoded on 2 qubits (d = n(D_enc+2) with D_enc = 0). U_q/U_k/U_v have depth 1. Q and K read ⟨Z₁⟩; V reads Z₁, Z₂, X₁, X₂. The Gaussian score is unscaled.
+  - `comajoan`: Comajoan Cara et al. (2024), following their official code (ML4SCI/QMLHEP). Quantum layers replace the Q/K/V and output projections and sit inside the FFN (Dense → quantum → GELU → Dense). Each layer acts on the full embedding, one qubit per feature: 16 qubits, and 32 in the FFN. Each layer is Rx angle embedding, then one BasicEntangler layer (trainable Rx + CNOT ring), then ⟨Z⟩ on every qubit. Attention stays dot-product.
 - Every circuit is checked against an independent NumPy statevector simulation: `python -m tools.test_circuits`
+
+**Finding: Comajoan Cara's quantum layer is exactly classical.** Before the CNOTs the state is a product state with ⟨Z_j⟩ = cos(x_j + w_j). CNOTs only turn Z-strings into Z-strings, so every output is exactly a product of cosines, ⟨Z_i⟩ = ∏_{j∈S_i} cos(x_j + w_j). The sets S_i come from pushing Z_i back through the CNOT ring ([`qvb/comajoan.py`](qvb/comajoan.py)). The bench uses this formula, so their 16- and 32-qubit layers run at classical speed. It matches a full statevector simulation to ~1e-16. With a 16-qubit ring, most outputs multiply 2–16 cosines, so they tend to shrink toward 0.
 
 ## Results (shared backbone, MNIST, 60 epochs, seeds 0/1/2, Kaggle CPU)
 | Attention | Params | Qubits / circuit | Circuits / image | s/epoch | Val acc | **Test acc** |
