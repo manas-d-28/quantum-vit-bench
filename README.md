@@ -67,6 +67,16 @@ Mean ± sample std over 3 seeds. Test accuracy is taken at the best-validation e
 - **HQViT (93.8 ± 0.7) ties its classical mimic (93.5 ± 1.2)** and is level with Unlu. †Its 5.5 s/epoch is an exact PyTorch simulation of the 16×16 block unitaries, with infinite-shot swap tests. A real device would need many shots per score. **Caveat on what its attention does:** whole-image amplitude encoding gives each of the 7 (LayerNormed, roughly equal-norm) tokens about 1/7 of the state's weight, so |⟨q_i|k_j⟩|² ≲ ‖x_i‖²‖x_j‖²/‖X‖⁴ ≈ 1/49 ≈ 0.02. A softmax over numbers this small is close to uniform, so HQViT's attention should behave almost like averaging over tokens. Its good score therefore suggests that on this task the attention pattern matters little.
 - **The uniform-attention control confirms it: 93.6 ± 0.9 with no queries or keys at all.** Every token just receives the average of all tokens' values. That ties Unlu, HQViT and both mimics, and beats dot-product attention. **So at this scale (7 tokens, 14×14 MNIST, ~4k params), the task cannot tell attention mechanisms apart.** The ties above are therefore not evidence that quantum attention matches classical attention in general. They only show that nothing here depends on the attention pattern. Next step: a harder setting where real attention clearly beats uniform, then re-run the modules there.
 
+## Does the task need attention at all? (classic vs uniform, 3 seeds, 60 epochs)
+| Setting | Tokens | Classic test | Uniform test | Classic − uniform |
+|---|---|---|---|---|
+| MNIST 14×14, 2×14 strips (main bench) | 7 | 92.3 ± 0.5 | 93.6 ± 0.9 | −1.3 |
+| MNIST 16×16, 4×4 patches | 16 | 91.7 ± 0.3 | 91.8 ± 1.3 | −0.1 |
+| Fashion-MNIST 14×14, 2×14 strips | 7 | 82.8 ± 0.5 | 84.3 ± 0.4 | −1.5 |
+| Fashion-MNIST 16×16, 4×4 patches | 16 | 81.5 ± 0.9 | 83.0 ± 0.7 | −1.4 |
+
+**In none of the four settings does real attention beat uniform averaging.** On Fashion-MNIST uniform is clearly better: in both settings every uniform seed beats every classic seed. At this scale (~4k params, 4k training images), the useful work is done per token by the embedding and FFN, followed by averaging. Learned attention only adds parameters that are hard to fit. So **classification accuracy at this scale cannot rank attention mechanisms**, quantum or classical. Raw: `results/control_harder/`.
+
 ## The shared backbone (`qvb/`)
 - `data.py`: MNIST resized to 14×14 and cut into 7 row-patches (7 tokens × 28 features). Split 4000/1000/1000 with a fixed seed, so every model sees the same images.
 - `backbone.py`: tiny pre-norm ViT, identical for every model:
