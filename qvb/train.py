@@ -32,7 +32,7 @@ def evaluate(model, loader, device):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--model", required=True, choices=["classic", "gaussian", "unlu", "qsann", "comajoan", "hqvit", "overlap"])
+    p.add_argument("--model", required=True, choices=["classic", "gaussian", "unlu", "qsann", "comajoan", "hqvit", "overlap", "uniform"])
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--epochs", type=int, default=60)
     p.add_argument("--embed", type=int, default=16)

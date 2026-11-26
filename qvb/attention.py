@@ -8,6 +8,7 @@ papers, where one d-qubit circuit handles one slice.
               score_ij = -(q_i - k_j)^2 / sqrt(d)
     unlu      Unlu et al. (2024): q, k, v produced by d-qubit circuits,
               same Gaussian-style score as `gaussian`
+    uniform   control: fixed 1/T attention weights (mean of values), no Q or K
     qsann     Li et al. (2022): entangling encoder on d/2 qubits, q, k = <Z_1>,
               v = d Pauli expectations; unscaled Gaussian score
 """
@@ -80,6 +81,19 @@ class UnluHead(nn.Module):
         return _attend(scores, v.to(x.dtype), d)
 
 
+class UniformHead(nn.Module):
+    """Control, not a paper: every token receives the plain average of all tokens'
+    values (attention weights fixed at 1/T, no queries or keys). If this scores as well
+    as the real attention modules, the task can't tell attention mechanisms apart."""
+
+    def __init__(self, d):
+        super().__init__()
+        self.v = nn.Linear(d, d, bias=False)
+
+    def forward(self, x):
+        return self.v(x).mean(dim=1, keepdim=True).expand_as(x)
+
+
 class QsannHead(nn.Module):
     """QSANN (Li et al. 2022): a d-feature token is encoded on n = d/2 qubits,
     q and k are <Z_1> after U_q / U_k, and v is d Pauli expectation values after U_v.
@@ -103,7 +117,8 @@ class QsannHead(nn.Module):
         return torch.softmax(-(q - k.transpose(1, 2)) ** 2, dim=-1) @ v
 
 
-HEADS = {"classic": ClassicHead, "gaussian": GaussianHead, "unlu": UnluHead, "qsann": QsannHead}
+HEADS = {"classic": ClassicHead, "gaussian": GaussianHead, "unlu": UnluHead, "qsann": QsannHead,
+         "uniform": UniformHead}
 # per quantum model: circuits per token per head (q, k, v) and qubits for a d-feature head
 QUANTUM = {"unlu": {"circuits_per_token_per_head": 3, "qubits": lambda d: d},
            "qsann": {"circuits_per_token_per_head": 3, "qubits": lambda d: d // 2}}
