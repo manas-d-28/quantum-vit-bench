@@ -42,6 +42,9 @@ def main():
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--device", default="cpu")
     p.add_argument("--out", default="results")
+    p.add_argument("--dataset", default="mnist", choices=["mnist", "fashion"])
+    p.add_argument("--img", type=int, default=14, help="image side after resizing")
+    p.add_argument("--patch", default="2x14", help="patch height x width, e.g. 2x14 or 4x4")
     p.add_argument("--quick", action="store_true", help="smoke test: 2 epochs, 640/160/160 images")
     a = p.parse_args()
 
@@ -49,8 +52,9 @@ def main():
         a.epochs = 2
     torch.manual_seed(a.seed)
     split = (640, 160, 160) if a.quick else None
-    tr, va, te, n_tokens, token_dim = (load_mnist(n_images=sum(split), split=split)
-                                       if a.quick else load_mnist())
+    data_kw = dict(dataset=a.dataset, img=a.img, patch=tuple(int(v) for v in a.patch.split("x")))
+    tr, va, te, n_tokens, token_dim = (load_mnist(n_images=sum(split), split=split, **data_kw)
+                                       if a.quick else load_mnist(**data_kw))
 
     if a.model == "comajoan":     # quantum Q/K/V, quantum W_O and a quantum layer in the FFN
         from .comajoan import ComajoanAttention, ComajoanFFN, CosineProductLayer
@@ -100,7 +104,8 @@ def main():
     wall = time.time() - t0
 
     model.load_state_dict(best_state)
-    row = {"model": a.model, "seed": a.seed, "epochs": a.epochs, "params": n_params,
+    row = {"model": a.model, "seed": a.seed, "dataset": a.dataset, "img": a.img, "patch": a.patch,
+           "tokens": n_tokens, "epochs": a.epochs, "params": n_params,
            "embed": a.embed, "heads": a.heads, "layers": a.layers, **meta,
            "best_val": round(best_val, 4), "best_epoch": best_epoch,
            "test_acc": round(evaluate(model, te, a.device), 4),
@@ -116,7 +121,7 @@ def main():
         if new:
             w.writeheader()
         w.writerow(row)
-    with open(os.path.join(a.out, f"curve_{a.model}_s{a.seed}.json"), "w") as f:
+    with open(os.path.join(a.out, f"curve_{a.model}_{a.dataset}{a.img}_{a.patch}_s{a.seed}.json"), "w") as f:
         json.dump(curve, f)
 
 
