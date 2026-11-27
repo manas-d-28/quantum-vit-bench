@@ -88,6 +88,8 @@ Mean ± sample std over 3 seeds. Test accuracy is taken at the best-validation e
 - `train.py`: trains one model and appends a row to `results/results.csv`. The row records params, qubits per circuit, circuits per image, best val, test acc (best-val checkpoint) and time per epoch.
 
 ```
+python -m qvb.train --model classic --task pair_same --seed 0     # two digits: same number?
+python -m qvb.train --model classic --task pair_larger --seed 0   # two digits: is left > right?
 python -m qvb.train --model unlu --seed 0 --epochs 60
 python -m qvb.train --model classic --quick        # 2-epoch smoke test on 640 images
 ```

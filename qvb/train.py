@@ -15,19 +15,24 @@ import torch.nn as nn
 
 from .attention import QUANTUM, make_attention
 from .backbone import TinyViT
-from .data import load_mnist
+from .data import load_mnist, load_pairs
+
+
+def predict(model, loader, device):
+    """Predicted class and true label for every example, in loader order."""
+    model.eval()
+    preds, labels = [], []
+    with torch.no_grad():
+        for x, y in loader:
+            preds.append(model(x.to(device)).argmax(-1).cpu())
+            labels.append(y)
+    model.train()
+    return torch.cat(preds), torch.cat(labels)
 
 
 def evaluate(model, loader, device):
-    model.eval()
-    correct = total = 0
-    with torch.no_grad():
-        for x, y in loader:
-            pred = model(x.to(device)).argmax(-1).cpu()
-            correct += (pred == y).sum().item()
-            total += len(y)
-    model.train()
-    return correct / total
+    p, y = predict(model, loader, device)
+    return (p == y).float().mean().item()
 
 
 def main():
@@ -42,6 +47,8 @@ def main():
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--device", default="cpu")
     p.add_argument("--out", default="results")
+    p.add_argument("--task", default="digits", choices=["digits", "pair_same", "pair_larger"],
+                   help="digits: 10-class classification; pair_*: two digits side by side, 2 classes")
     p.add_argument("--dataset", default="mnist", choices=["mnist", "fashion"])
     p.add_argument("--img", type=int, default=14, help="image side after resizing")
     p.add_argument("--patch", default="2x14", help="patch height x width, e.g. 2x14 or 4x4")
@@ -53,8 +60,15 @@ def main():
     torch.manual_seed(a.seed)
     split = (640, 160, 160) if a.quick else None
     data_kw = dict(dataset=a.dataset, img=a.img, patch=tuple(int(v) for v in a.patch.split("x")))
-    tr, va, te, n_tokens, token_dim = (load_mnist(n_images=sum(split), split=split, **data_kw)
-                                       if a.quick else load_mnist(**data_kw))
+    if a.task == "digits":
+        tr, va, te, n_tokens, token_dim = (load_mnist(n_images=sum(split), split=split, **data_kw)
+                                           if a.quick else load_mnist(**data_kw))
+        n_classes = 10
+    else:
+        sizes = {"train": 640, "val": 160, "test": 160} if a.quick else None
+        tr, va, te, n_tokens, token_dim = load_pairs(a.task, img=a.img, patch=data_kw["patch"],
+                                                     sizes=sizes)
+        n_classes = 2
 
     if a.model == "comajoan":     # quantum Q/K/V, quantum W_O and a quantum layer in the FFN
         from .comajoan import ComajoanAttention, ComajoanFFN, CosineProductLayer
@@ -68,7 +82,7 @@ def main():
     else:
         parts = dict(make_attention=make_attention(a.model, a.embed, a.heads))
     model = TinyViT(n_tokens, token_dim, embed_dim=a.embed, n_layers=a.layers, ff_dim=a.ff,
-                    **parts).to(a.device)
+                    n_classes=n_classes, **parts).to(a.device)
     n_params = sum(p.numel() for p in model.parameters())
     opt = torch.optim.Adam(model.parameters(), lr=a.lr)
     loss_fn = nn.CrossEntropyLoss()
@@ -104,11 +118,13 @@ def main():
     wall = time.time() - t0
 
     model.load_state_dict(best_state)
-    row = {"model": a.model, "seed": a.seed, "dataset": a.dataset, "img": a.img, "patch": a.patch,
+    test_pred, test_y = predict(model, te, a.device)
+    tag = f"{a.model}_{a.task}_{a.dataset}{a.img}_{a.patch}_lr{a.lr:g}_s{a.seed}"
+    row = {"model": a.model, "seed": a.seed, "task": a.task, "lr": a.lr, "dataset": a.dataset, "img": a.img, "patch": a.patch,
            "tokens": n_tokens, "epochs": a.epochs, "params": n_params,
            "embed": a.embed, "heads": a.heads, "layers": a.layers, **meta,
            "best_val": round(best_val, 4), "best_epoch": best_epoch,
-           "test_acc": round(evaluate(model, te, a.device), 4),
+           "test_acc": round((test_pred == test_y).float().mean().item(), 4),
            "sec_per_epoch": round(wall / a.epochs, 1), "wall_min": round(wall / 60, 1),
            "quick": a.quick}
     print("RESULT " + json.dumps(row), flush=True)
@@ -121,7 +137,10 @@ def main():
         if new:
             w.writeheader()
         w.writerow(row)
-    with open(os.path.join(a.out, f"curve_{a.model}_{a.dataset}{a.img}_{a.patch}_s{a.seed}.json"), "w") as f:
+    # per-example test predictions, for paired statistics across models (tools/stats.py)
+    torch.save({"pred": test_pred.to(torch.int8), "label": test_y.to(torch.int8)},
+               os.path.join(a.out, f"preds_{tag}.pt"))
+    with open(os.path.join(a.out, f"curve_{tag}.json"), "w") as f:
         json.dump(curve, f)
 
 
