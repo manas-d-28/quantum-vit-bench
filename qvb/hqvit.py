@@ -129,3 +129,25 @@ class OverlapMimic(nn.Module):
         xn = _normalise_whole_image(x)
         coef = (self.q(xn) @ self.k(xn).transpose(1, 2)) ** 2
         return torch.softmax(coef, dim=-1) @ self.v(xn) ** 2
+
+
+class _LowRank(nn.Module):
+    """x -> x @ (A @ B)^T with A: E x r, B: r x E  (2 E r parameters instead of E^2)."""
+
+    def __init__(self, dim, rank):
+        super().__init__()
+        self.a = nn.Linear(rank, dim, bias=False)
+        self.b = nn.Linear(dim, rank, bias=False)
+
+    def forward(self, x):
+        return self.a(self.b(x))
+
+
+class OverlapMimicSmall(OverlapMimic):
+    """Same as OverlapMimic, but W_Q, W_K, W_V are rank-2, so the whole model has about
+    as many parameters as HQViT (3 x 64 = 192 per block, vs HQViT's 60 and the full
+    mimic's 768). Answers the reviewer point that the full mimic is ~38% larger."""
+
+    def __init__(self, embed_dim, rank=2):
+        nn.Module.__init__(self)
+        self.q, self.k, self.v = (_LowRank(embed_dim, rank) for _ in range(3))

@@ -37,7 +37,7 @@ def evaluate(model, loader, device):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--model", required=True, choices=["classic", "gaussian", "unlu", "qsann", "comajoan", "hqvit", "overlap", "uniform"])
+    p.add_argument("--model", required=True, choices=["classic", "gaussian", "unlu", "qsann", "comajoan", "hqvit", "overlap", "overlap_small", "uniform"])
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--epochs", type=int, default=60)
     p.add_argument("--embed", type=int, default=16)
@@ -75,9 +75,10 @@ def main():
         parts = dict(make_attention=lambda: ComajoanAttention(a.embed, a.heads),
                      make_proj=lambda: CosineProductLayer(a.embed),
                      make_ffn=lambda: ComajoanFFN(a.embed, a.ff))
-    elif a.model in ("hqvit", "overlap"):   # single full-width head, as in HQViT
-        from .hqvit import HQViTAttention, OverlapMimic
-        cls = HQViTAttention if a.model == "hqvit" else OverlapMimic
+    elif a.model in ("hqvit", "overlap", "overlap_small"):   # single full-width head, as in HQViT
+        from .hqvit import HQViTAttention, OverlapMimic, OverlapMimicSmall
+        cls = {"hqvit": HQViTAttention, "overlap": OverlapMimic,
+               "overlap_small": OverlapMimicSmall}[a.model]
         parts = dict(make_attention=lambda: cls(a.embed))
     else:
         parts = dict(make_attention=make_attention(a.model, a.embed, a.heads))
@@ -138,8 +139,9 @@ def main():
             w.writeheader()
         w.writerow(row)
     # per-example test predictions, for paired statistics across models (tools/stats.py)
-    torch.save({"pred": test_pred.to(torch.int8), "label": test_y.to(torch.int8)},
-               os.path.join(a.out, f"preds_{tag}.pt"))
+    import numpy as np
+    np.savez_compressed(os.path.join(a.out, f"preds_{tag}.npz"),
+                        pred=test_pred.numpy().astype(np.int8), label=test_y.numpy().astype(np.int8))
     with open(os.path.join(a.out, f"curve_{tag}.json"), "w") as f:
         json.dump(curve, f)
 

@@ -42,7 +42,15 @@ Classical "mimics" of each scoring trick are included, so we can tell whether a 
   - `comajoan`: Comajoan Cara et al. (2024), following their official code (ML4SCI/QMLHEP). Quantum layers replace the Q/K/V and output projections and sit inside the FFN (Dense → quantum → GELU → Dense). Each layer acts on the full embedding, one qubit per feature: 16 qubits, and 32 in the FFN. Each layer is Rx angle embedding, then one BasicEntangler layer (trainable Rx + CNOT ring), then ⟨Z⟩ on every qubit. Attention stays dot-product.
   - `hqvit`: HQViT (arXiv:2504.02730), built from the paper (no official code). All tokens are amplitude-encoded together, normalised by the whole image's norm (3 index qubits + 4 patch qubits). Block-diagonal PQCs U_Q/U_K/U_V act on the 4-qubit patch register. Scores are the swap-test overlaps |⟨q_i|k_j⟩|², softmaxed with no scaling. V is measured, giving probabilities |(U_V x_i)_l|². One full-width head. *Assumption:* the paper gives no gate list, so the PQC here is 2 layers of [Ry, Rz on every qubit, CNOT ring], then a final Ry layer. The 16×16 unitary is built and applied exactly in PyTorch (noiseless, infinite shots).
   - `overlap`: classical mimic of HQViT. Same formula and normalisation, but with free real matrices instead of unitaries.
+  - `overlap_small`: the same mimic with rank-2 W_Q/W_K/W_V. The whole model has 3,978 params, the same as `classic` and within 7% of `hqvit`.
 - Every circuit is checked against an independent NumPy statevector simulation (and HQViT's unitary against TensorCircuit): `python -m tools.test_circuits`
+
+## Statistics and tuning (`tools/`)
+- `qvb/train.py` saves per-example test predictions (`preds_*.npz`) for every run.
+- `python -m tools.stats RESULTS_DIR` prints mean ± std and a **95% CI**. The CI comes from a two-level bootstrap: resample seeds, then test examples.
+- `python -m tools.stats RESULTS_DIR --task T --compare A B` runs a **paired** comparison on identical test examples. It prints the 95% CI of the difference and a bootstrap p-value, and runs an **equivalence test**: a 90% CI inside ±margin points (TOST).
+- `python -m tools.stats RESULTS_DIR --select-lr` picks each model's learning rate by mean **validation** accuracy. The test set is never used for tuning.
+- `sh tools/run_grid.sh TASK "MODELS" "LRS" "SEEDS" EPOCHS OUT` runs the learning-rate search and the final seeds.
 
 **Finding: Comajoan Cara's quantum layer is exactly classical.** Before the CNOTs the state is a product state with ⟨Z_j⟩ = cos(x_j + w_j). CNOTs only turn Z-strings into Z-strings, so every output is exactly a product of cosines, ⟨Z_i⟩ = ∏_{j∈S_i} cos(x_j + w_j). The sets S_i come from pushing Z_i back through the CNOT ring ([`qvb/comajoan.py`](qvb/comajoan.py)). The bench uses this formula, so their 16- and 32-qubit layers run at classical speed. It matches a full statevector simulation to ~1e-16. With a 16-qubit ring, most outputs multiply 2–16 cosines, so they tend to shrink toward 0.
 
