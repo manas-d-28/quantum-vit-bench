@@ -85,6 +85,14 @@ Mean ± sample std over 3 seeds. Test accuracy is taken at the best-validation e
 
 **In none of the four settings does real attention beat uniform averaging.** On Fashion-MNIST uniform is clearly better: in both settings every uniform seed beats every classic seed. At this scale (~4k params, 4k training images), the useful work is done per token by the embedding and FFN, followed by averaging. Learned attention only adds parameters that are hard to fit. So **classification accuracy at this scale cannot rank attention mechanisms**, quantum or classical. Raw: `results/control_harder/`.
 
+## Pair-task screen (positive-control search, rule fixed in advance in `docs/task_selection_rule.md`)
+| Task | Classic | Uniform | Gap | Qualifies (≥3 pts, no overlap)? |
+|---|---|---|---|---|
+| pair_same (do the two digits match?) | 85.5 ± 0.3 | 84.3 ± 0.6 | +1.2 | no: no overlap, but gap < 3 |
+| pair_larger (is left > right?) | 89.5 ± 0.4 | 89.4 ± 0.3 | +0.1 | no |
+
+`pair_same` is the first setting where attention consistently beats uniform averaging, but by less than the threshold. Next, per the rule: the scale-up fallback.
+
 ## The shared backbone (`qvb/`)
 - `data.py`: MNIST resized to 14×14 and cut into 7 row-patches (7 tokens × 28 features). Split 4000/1000/1000 with a fixed seed, so every model sees the same images.
 - `backbone.py`: tiny pre-norm ViT, identical for every model:

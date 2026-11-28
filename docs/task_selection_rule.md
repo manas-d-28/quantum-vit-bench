@@ -22,3 +22,14 @@ the scale-up fallback (larger backbone / more data) under the same rule.
 
 The chosen task is then used, unchanged, for the tuning and final runs of every
 module (5 seeds each).
+
+## Outcome (pair-task screen, run 2026-11-27, read 2026-11-28)
+| Task | Classic (3 seeds) | Uniform (3 seeds) | Gap | Every classic seed > every uniform seed? | Qualifies? |
+|---|---|---|---|---|---|
+| pair_same | 85.5 ± 0.3 | 84.3 ± 0.6 | +1.2 | yes | **no** (gap < 3) |
+| pair_larger | 89.5 ± 0.4 | 89.4 ± 0.3 | +0.1 | no | **no** |
+
+Neither task meets the rule. `pair_same` is the first setting where attention beats
+uniform consistently (all three classic seeds above all three uniform seeds), but the
+gap is +1.2 points, below the 3-point threshold. As written above, the next step is
+the scale-up fallback, under the same rule. Raw: `results/pair_screen/results.csv`.
